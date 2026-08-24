@@ -289,7 +289,11 @@ function demanderConjoint(chatId) {
 
 function demanderEnfants(chatId) {
   const b = (n) => ({ text: String(n), callback_data: 'E|' + n });
-  return envoyer(chatId, "Combien d'enfants a charge avez-vous ?",
+  return envoyer(chatId,
+    "Combien d'enfants a charge avez-vous ?\n\n" +
+    "<i>Sont consideres comme enfants a charge : les enfants mineurs, " +
+    "les enfants infirmes, ainsi que les enfants ages de moins de 25 ans " +
+    "lorsqu'ils poursuivent leurs etudes.</i>",
     [[b(0), b(1), b(2), b(3)], [b(4), b(5), b(6), b(7)], [b(8), b(9), b(10)]]);
 }
 
