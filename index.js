@@ -7,9 +7,11 @@
  **************************************************************************************/
 
 const express = require('express');
+const { createClient } = require('redis');
 
 const TOKEN = process.env.TELEGRAM_TOKEN;
 const BASE_URL = process.env.BASE_URL || '';
+const REDIS_URL = process.env.REDIS_URL || '';
 const PORT = process.env.PORT || 3000;
 const API = 'https://api.telegram.org/bot' + TOKEN + '/';
 
@@ -179,6 +181,76 @@ function dejaTraite(updateId) {
 
 
 /* ====================================================================================
+   COMPTEUR D'UTILISATION
+   ------------------------------------------------------------------------------------
+   Stocké dans l'instance Key Value de Render. Si elle est indisponible, le bot
+   continue de fonctionner normalement avec un comptage en mémoire vive.
+   ==================================================================================== */
+
+const CLE_UTILISATEURS = 'irtrimf:utilisateurs';   // ensemble des chat_id rencontrés
+const CLE_SIMULATIONS  = 'irtrimf:simulations';    // nombre de calculs aboutis
+
+let baseKV = null;
+const secours = { utilisateurs: new Set(), simulations: 0 };
+
+async function connecterBase() {
+  if (!REDIS_URL) {
+    console.log('Aucune base configurée : comptage en mémoire vive.');
+    return;
+  }
+  try {
+    const client = createClient({ url: REDIS_URL });
+    client.on('error', (e) => console.error('Base indisponible :', e.message));
+    await client.connect();
+    baseKV = client;
+    console.log('Base de comptage connectée.');
+  } catch (err) {
+    console.error('Connexion à la base impossible :', err.message);
+  }
+}
+
+/** Enregistre le passage d'un utilisateur (sans effet s'il est déjà connu). */
+async function enregistrerUtilisateur(chatId) {
+  try {
+    if (baseKV) return await baseKV.sAdd(CLE_UTILISATEURS, String(chatId));
+  } catch (err) {
+    console.error('Ecriture utilisateur impossible :', err.message);
+  }
+  secours.utilisateurs.add(String(chatId));
+}
+
+/** Incrémente le nombre de simulations abouties. */
+async function enregistrerSimulation() {
+  try {
+    if (baseKV) return await baseKV.incr(CLE_SIMULATIONS);
+  } catch (err) {
+    console.error('Ecriture simulation impossible :', err.message);
+  }
+  secours.simulations += 1;
+}
+
+/** Renvoie { utilisateurs, simulations }. */
+async function lireCompteurs() {
+  try {
+    if (baseKV) {
+      const utilisateurs = await baseKV.sCard(CLE_UTILISATEURS);
+      const simulations = parseInt(await baseKV.get(CLE_SIMULATIONS), 10) || 0;
+      return { utilisateurs, simulations };
+    }
+  } catch (err) {
+    console.error('Lecture des compteurs impossible :', err.message);
+  }
+  return { utilisateurs: secours.utilisateurs.size, simulations: secours.simulations };
+}
+
+function ligneCompteur(c) {
+  const u = c.utilisateurs + (c.utilisateurs > 1 ? ' salariés ont' : ' salarié a');
+  const s = c.simulations + (c.simulations > 1 ? ' simulations réalisées' : ' simulation réalisée');
+  return '👥 ' + u + ' déjà utilisé ce calculateur — ' + s + '.';
+}
+
+
+/* ====================================================================================
    DIALOGUE
    ==================================================================================== */
 
@@ -194,6 +266,17 @@ async function traiterUpdate(update) {
 async function traiterMessage(message) {
   const chatId = message.chat.id;
   const texte = (message.text || '').trim();
+
+  enregistrerUtilisateur(chatId);
+
+  if (texte === '/stats') {
+    const c = await lireCompteurs();
+    return envoyer(chatId,
+      "📈 <b>Utilisation du calculateur</b>\n\n" +
+      "Utilisateurs : <b>" + fmt(c.utilisateurs) + "</b>\n" +
+      "Simulations abouties : <b>" + fmt(c.simulations) + "</b>\n\n" +
+      "🔁 Tapez /calcul pour lancer une simulation.");
+  }
 
   if (texte === '/start' || texte === '/calcul' || texte === '/aide') {
     effacerEtat(chatId);
@@ -220,6 +303,8 @@ async function traiterBouton(cb) {
   const chatId = cb.message.chat.id;
   const data = cb.data || '';
   const etat = lireEtat(chatId);
+
+  enregistrerUtilisateur(chatId);
 
   await tg('answerCallbackQuery', { callback_query_id: cb.id });
 
@@ -249,6 +334,7 @@ async function traiterBouton(cb) {
 
   if (partie[0] === 'E') {
     etat.enfants = parseInt(partie[1], 10);
+    await enregistrerSimulation();
     await envoyerResultat(chatId, etat);
     return effacerEtat(chatId);
   }
@@ -304,7 +390,7 @@ function demanderEnfants(chatId) {
     [[b(0), b(1), b(2), b(3)], [b(4), b(5), b(6), b(7)], [b(8), b(9), b(10)]]);
 }
 
-function envoyerResultat(chatId, etat) {
+async function envoyerResultat(chatId, etat) {
   const r = liquider(etat.brut, etat.situation, etat.conjoint === true, etat.enfants);
 
   let famille = (etat.situation === 'marie') ? 'Marié(e)' : 'Célibataire';
@@ -360,6 +446,7 @@ function envoyerResultat(chatId, etat) {
   t += "<i>Simulation indicative établie sur la base du barème en vigueur (CGI, art. 173 et " +
        "174) et d'une année complète de travail. Elle ne se substitue pas au calcul de " +
        "l'employeur ni à une décision de l'administration fiscale.</i>\n\n";
+  t += ligneCompteur(await lireCompteurs()) + "\n\n";
   t += "🔁 Tapez /calcul pour une nouvelle simulation.";
 
   return envoyer(chatId, t);
@@ -384,6 +471,7 @@ app.post('/webhook', (req, res) => {
 
 app.listen(PORT, async () => {
   console.log('Bot IR-TRIMF demarre sur le port ' + PORT);
+  await connecterBase();
   if (BASE_URL) {
     const r = await tg('setWebhook', {
       url: BASE_URL.replace(/\/$/, '') + '/webhook',
