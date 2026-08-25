@@ -443,7 +443,27 @@ async function envoyerResultat(chatId, etat) {
        "l'employeur ni à une décision de l'administration fiscale.</i>\n\n";
   t += "🔁 Tapez /calcul pour une nouvelle simulation.";
 
-  return envoyer(chatId, t);
+  await envoyer(chatId, t);
+  return envoyerNoticeRestitution(chatId);
+}
+
+/** Message complémentaire, envoyé systématiquement après le résultat. */
+function envoyerNoticeRestitution(chatId) {
+  let n = '';
+  n += "📄 <b>Vous avez payé plus que ce que vous deviez ?</b>\n\n";
+  n += "Lorsque le montant de l'impôt supporté est supérieur à la somme effectivement due, " +
+       "vous pouvez obtenir la <b>restitution des droits payés en trop</b>.\n\n";
+  n += "La demande prend la forme d'une <b>réclamation adressée au Chef du service chargé " +
+       "de l'assiette des impôts</b>, <b>avant le 1er avril de l'année suivante</b>.\n\n";
+  n += "<b>Pièces à joindre à la demande :</b>\n";
+  n += "• les <b>12 bulletins de salaire</b> de l'année écoulée\n";
+  n += "• les justificatifs de votre situation de famille : <b>certificat de mariage</b> et " +
+       "<b>extraits de naissance des enfants</b>, datant de moins de <b>3 mois</b>\n";
+  n += "• un <b>certificat de travail</b>\n";
+  n += "• un <b>certificat de chômage</b> du conjoint(e), s'il ou elle ne dispose pas de revenus\n";
+  n += "• une <b>copie de votre pièce d'identité</b>\n\n";
+  n += "<i>Passé le 1er avril, la demande n'est plus recevable pour l'année concernée.</i>";
+  return envoyer(chatId, n);
 }
 
 
