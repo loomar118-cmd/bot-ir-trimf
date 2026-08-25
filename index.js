@@ -12,6 +12,7 @@ const { createClient } = require('redis');
 const TOKEN = process.env.TELEGRAM_TOKEN;
 const BASE_URL = process.env.BASE_URL || '';
 const REDIS_URL = process.env.REDIS_URL || '';
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '';   // seul destinataire de /stats
 const PORT = process.env.PORT || 3000;
 const API = 'https://api.telegram.org/bot' + TOKEN + '/';
 
@@ -243,12 +244,6 @@ async function lireCompteurs() {
   return { utilisateurs: secours.utilisateurs.size, simulations: secours.simulations };
 }
 
-function ligneCompteur(c) {
-  const u = c.utilisateurs + (c.utilisateurs > 1 ? ' salariés ont' : ' salarié a');
-  const s = c.simulations + (c.simulations > 1 ? ' simulations réalisées' : ' simulation réalisée');
-  return '👥 ' + u + ' déjà utilisé ce calculateur — ' + s + '.';
-}
-
 
 /* ====================================================================================
    DIALOGUE
@@ -269,13 +264,13 @@ async function traiterMessage(message) {
 
   enregistrerUtilisateur(chatId);
 
-  if (texte === '/stats') {
+  if (texte === '/stats' && String(chatId) === ADMIN_CHAT_ID) {
     const c = await lireCompteurs();
     return envoyer(chatId,
       "📈 <b>Utilisation du calculateur</b>\n\n" +
       "Utilisateurs : <b>" + fmt(c.utilisateurs) + "</b>\n" +
       "Simulations abouties : <b>" + fmt(c.simulations) + "</b>\n\n" +
-      "🔁 Tapez /calcul pour lancer une simulation.");
+      "<i>Statistiques réservées à l'administrateur.</i>");
   }
 
   if (texte === '/start' || texte === '/calcul' || texte === '/aide') {
@@ -446,7 +441,6 @@ async function envoyerResultat(chatId, etat) {
   t += "<i>Simulation indicative établie sur la base du barème en vigueur (CGI, art. 173 et " +
        "174) et d'une année complète de travail. Elle ne se substitue pas au calcul de " +
        "l'employeur ni à une décision de l'administration fiscale.</i>\n\n";
-  t += ligneCompteur(await lireCompteurs()) + "\n\n";
   t += "🔁 Tapez /calcul pour une nouvelle simulation.";
 
   return envoyer(chatId, t);
