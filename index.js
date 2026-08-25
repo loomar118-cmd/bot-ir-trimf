@@ -208,7 +208,7 @@ async function traiterMessage(message) {
       "Ou tapez /calcul pour recommencer.");
   }
   if (montant > 2000000000) {
-    return envoyer(chatId, "Ce montant parait anormalement eleve. Verifiez votre saisie, " +
+    return envoyer(chatId, "Ce montant paraît anormalement élevé. Vérifiez votre saisie, " +
                            "puis renvoyez-le.");
   }
 
@@ -225,7 +225,7 @@ async function traiterBouton(cb) {
 
   if (!etat.brut) {
     return envoyer(chatId,
-      "Ces boutons appartiennent a une simulation precedente.\n\n" +
+      "Ces boutons appartiennent à une simulation précédente.\n\n" +
       "➡️ Envoyez-moi simplement votre <b>salaire brut imposable annuel</b> " +
       "en chiffres (exemple : <code>5497607</code>) et je reprends le calcul.");
   }
@@ -256,16 +256,20 @@ async function traiterBouton(cb) {
 
 function demanderSalaire(chatId, avecAide) {
   let texte =
-    "👋 <b>Calculateur IR + TRIMF — salaries du Senegal</b>\n\n" +
-    "Je calcule votre <b>impot sur le revenu (retenue a la source sur salaires)</b> et " +
-    "votre <b>TRIMF</b> pour une annee complete.\n\n" +
+    "👋 <b>Calculateur IR + TRIMF — salariés du Sénégal</b>\n\n" +
+    "Je calcule votre <b>impôt sur le revenu (retenue à la source sur salaires)</b> et " +
+    "votre <b>TRIMF</b> pour une année complète.\n\n" +
     "➡️ Envoyez-moi votre <b>salaire brut imposable annuel</b> en chiffres " +
-    "(exemple : <code>5497607</code>).";
+    "(exemple : <code>5497607</code>).\n\n" +
+    "<i>Il s'agit du cumul annuel de vos rémunérations imposables — salaire de base, " +
+    "primes, indemnités et avantages en nature imposables — après déduction des " +
+    "cotisations sociales obligatoires (retraite) et avant l'abattement de 30 % pour " +
+    "frais professionnels, que j'applique moi-même.</i>";
   if (avecAide) {
     texte +=
-      "\n\nℹ️ Le salaire brut imposable est le cumul annuel figurant sur vos bulletins de " +
-      "paie, <i>avant</i> abattement de 30 % pour frais professionnels et <i>apres</i> " +
-      "deduction des cotisations sociales obligatoires (retraite).";
+      "\n\nℹ️ Ce montant figure sur votre bulletin de paie de décembre, ou sur votre " +
+      "attestation annuelle de salaire, sous l'intitulé « brut imposable » ou « base " +
+      "imposable ». Ne saisissez ni le salaire net perçu, ni le brut avant cotisations.";
   }
   return envoyer(chatId, texte);
 }
@@ -274,14 +278,17 @@ function demanderSituation(chatId, montant) {
   return envoyer(chatId,
     "Salaire brut imposable annuel : <b>" + fmt(montant) + " F CFA</b>\n\n" +
     "Quelle est votre situation matrimoniale ?",
-    [[{ text: '💍 Marie(e)', callback_data: 'S|marie' },
-      { text: '🙋 Celibataire', callback_data: 'S|celib' }]]);
+    [[{ text: '💍 Marié(e)', callback_data: 'S|marie' },
+      { text: '🙋 Célibataire', callback_data: 'S|celib' }]]);
 }
 
 function demanderConjoint(chatId) {
   return envoyer(chatId,
     "Votre conjoint(e) dispose-t-il/elle de revenus propres ?\n\n" +
-    "<i>Un conjoint sans revenus ouvre droit a une demi-part supplementaire, " +
+    "<i>Constituent des revenus propres : un salaire, une pension ou une retraite, " +
+    "ainsi que les revenus d'une activité commerciale, artisanale, libérale, agricole " +
+    "ou d'une location. Un conjoint sans activité rémunérée est considéré à charge.</i>\n\n" +
+    "<i>Un conjoint sans revenus ouvre droit à une demi-part supplémentaire, " +
     "mais double la TRIMF.</i>",
     [[{ text: 'Conjoint(e) SANS revenus', callback_data: 'C|1' }],
      [{ text: 'Conjoint(e) AVEC revenus', callback_data: 'C|0' }]]);
@@ -290,69 +297,69 @@ function demanderConjoint(chatId) {
 function demanderEnfants(chatId) {
   const b = (n) => ({ text: String(n), callback_data: 'E|' + n });
   return envoyer(chatId,
-    "Combien d'enfants a charge avez-vous ?\n\n" +
-    "<i>Sont consideres comme enfants a charge : les enfants mineurs, " +
-    "les enfants infirmes, ainsi que les enfants ages de moins de 25 ans " +
-    "lorsqu'ils poursuivent leurs etudes.</i>",
+    "Combien d'enfants à charge avez-vous ?\n\n" +
+    "<i>Sont considérés comme enfants à charge : les enfants mineurs, " +
+    "les enfants infirmes, ainsi que les enfants âgés de moins de 25 ans " +
+    "lorsqu'ils poursuivent leurs études.</i>",
     [[b(0), b(1), b(2), b(3)], [b(4), b(5), b(6), b(7)], [b(8), b(9), b(10)]]);
 }
 
 function envoyerResultat(chatId, etat) {
   const r = liquider(etat.brut, etat.situation, etat.conjoint === true, etat.enfants);
 
-  let famille = (etat.situation === 'marie') ? 'Marie(e)' : 'Celibataire';
+  let famille = (etat.situation === 'marie') ? 'Marié(e)' : 'Célibataire';
   if (etat.situation === 'marie') {
     famille += etat.conjoint ? ', conjoint(e) sans revenus' : ', conjoint(e) avec revenus';
   }
-  famille += ', ' + etat.enfants + (etat.enfants > 1 ? ' enfants' : ' enfant') + ' a charge';
+  famille += ', ' + etat.enfants + (etat.enfants > 1 ? ' enfants' : ' enfant') + ' à charge';
 
   let t = '';
   t += "📊 <b>LIQUIDATION ANNUELLE — IR ET TRIMF</b>\n\n";
 
-  t += "<b>1️⃣ Determination du revenu net imposable</b>\n";
+  t += "<b>1️⃣ Détermination du revenu net imposable</b>\n";
   t += "Salaire brut imposable : <b>" + fmt(r.brut) + "</b> F\n";
   t += "Abattement frais professionnels (30 %, plafond " + fmt(ABATTEMENT_PLAFOND) +
        ") : − " + fmt(r.abattement) + " F\n";
-  t += "Revenu net imposable (arrondi au millier inferieur) : <b>" + fmt(r.net) + "</b> F\n\n";
+  t += "Revenu net imposable (arrondi au millier inférieur) : <b>" + fmt(r.net) + "</b> F\n\n";
 
   t += "<b>2️⃣ Situation de famille</b>\n";
   t += famille + "\n";
   t += "Nombre de parts : <b>" + String(r.parts).replace('.', ',') + "</b>";
-  if (r.parts === PARTS_MAX) t += " (plafond legal atteint)";
+  if (r.parts === PARTS_MAX) t += " (plafond légal atteint)";
   t += "\n\n";
 
-  t += "<b>3️⃣ IR selon le bareme progressif</b>\n";
+  t += "<b>3️⃣ IR selon le barème progressif</b>\n";
   if (r.detail.length === 0) {
-    t += "Revenu inferieur a " + fmt(630000) + " F : aucun impot exigible.\n";
+    t += "Revenu inférieur à " + fmt(630000) + " F : aucun impôt exigible.\n";
   } else {
     for (const d of r.detail) {
-      const borne = (d.a === Infinity) ? "au-dela de " + fmt(d.de) : fmt(d.de) + " → " + fmt(d.a);
+      const borne = (d.a === Infinity) ? "au-delà de " + fmt(d.de) : fmt(d.de) + " → " + fmt(d.a);
       t += "• " + borne + " : " + fmt(d.base) + " × " + pct(d.taux) +
            " = <b>" + fmt(d.montant) + "</b> F\n";
     }
   }
-  t += "IR avant reduction : <b>" + fmt(r.irBareme) + "</b> F\n\n";
+  t += "IR avant réduction : <b>" + fmt(r.irBareme) + "</b> F\n\n";
 
-  t += "<b>4️⃣ Reduction pour charge de famille</b>\n";
+  t += "<b>4️⃣ Réduction pour charge de famille</b>\n";
   if (r.reduction.taux === 0) {
-    t += "Aucune reduction (1 part).\n\n";
+    t += "Aucune réduction (1 part).\n\n";
   } else {
     t += "Taux applicable : " + pct(r.reduction.taux) + " → " + fmt(r.reduction.theorique) + " F\n";
     t += "Encadrement : minimum " + fmt(r.reduction.min) + " / maximum " + fmt(r.reduction.max) + " F\n";
-    t += "Reduction retenue : − <b>" + fmt(r.reduction.montant) + "</b> F\n\n";
+    t += "Réduction retenue : − <b>" + fmt(r.reduction.montant) + "</b> F\n\n";
   }
 
-  t += "<b>5️⃣ Resultat</b>\n";
-  t += "🔹 <b>IR annuel du : " + fmt(r.irDu) + " F CFA</b>\n";
+  t += "<b>5️⃣ Résultat</b>\n";
+  t += "🔹 <b>IR annuel dû : " + fmt(r.irDu) + " F CFA</b>\n";
   t += "🔹 <b>TRIMF annuelle : " + fmt(r.trimf.total) + " F CFA</b>";
-  if (r.trimf.double) t += " (" + fmt(r.trimf.base) + " × 2, conjoint a charge)";
+  if (r.trimf.double) t += " (" + fmt(r.trimf.base) + " × 2, conjoint à charge)";
   t += "\n";
   t += "🔸 <b>TOTAL IR + TRIMF : " + fmt(r.total) + " F CFA</b>\n";
   t += "Soit environ <b>" + fmt(r.total / 12) + " F par mois</b>.\n\n";
 
-  t += "<i>Simulation indicative etablie sur la base du bareme en vigueur (CGI, art. 173 et " +
-       "174) et d'une annee complete de travail. Elle ne se substitue pas au calcul de " +
-       "l'employeur ni a une decision de l'administration fiscale.</i>\n\n";
+  t += "<i>Simulation indicative établie sur la base du barème en vigueur (CGI, art. 173 et " +
+       "174) et d'une année complète de travail. Elle ne se substitue pas au calcul de " +
+       "l'employeur ni à une décision de l'administration fiscale.</i>\n\n";
   t += "🔁 Tapez /calcul pour une nouvelle simulation.";
 
   return envoyer(chatId, t);
